@@ -68,7 +68,7 @@ canvas{
     <div id="ui">
         W A S D = 移動<br>
         ← → ↑ ↓ = 視点移動<br>
-        クリック = ブロック破壊 / 鉱石採掘
+        E = ブロック破壊 / 鉱石採掘
     </div>
 
     <div id="crosshair">+</div>
@@ -111,11 +111,11 @@ const sun = new THREE.DirectionalLight(0xffffff,1);
 sun.position.set(10,20,10);
 scene.add(sun);
 
-// 保存
+// 保存用
 const breakableObjects = [];
 const oreObjects = [];
 
-// 地面
+// 地面ブロック
 const blockGeo = new THREE.BoxGeometry(1,1,1);
 
 for(let x=-20;x<=20;x++){
@@ -223,7 +223,7 @@ function movePlayer(){
         -Math.sin(yaw)
     );
 
-    // 修正済み
+    // W/S 修正済み
     if(keys["w"] || keys["W"]){
         camera.position.addScaledVector(
             forward,
@@ -258,7 +258,12 @@ function movePlayer(){
 // レイキャスト
 const raycaster = new THREE.Raycaster();
 
-window.addEventListener("click",()=>{
+// Eキーで破壊
+window.addEventListener("keydown",(e)=>{
+
+    if(e.key !== "e" && e.key !== "E"){
+        return;
+    }
 
     raycaster.setFromCamera(
         new THREE.Vector2(0,0),
@@ -295,6 +300,7 @@ window.addEventListener("click",()=>{
     }
 });
 
+// リサイズ
 function resize(){
 
     const w = container.clientWidth;
@@ -308,6 +314,7 @@ function resize(){
 
 window.addEventListener("resize",resize);
 
+// メインループ
 function animate(){
 
     requestAnimationFrame(animate);
