@@ -42,10 +42,11 @@ canvas{
     top:10px;
     left:10px;
     color:white;
-    background:rgba(0,0,0,0.5);
+    background:rgba(0,0,0,0.55);
     padding:10px;
-    border-radius:8px;
+    border-radius:10px;
     z-index:10;
+    line-height:1.6;
 }
 
 #crosshair{
@@ -54,9 +55,50 @@ canvas{
     top:50%;
     transform:translate(-50%, -50%);
     color:white;
-    font-size:26px;
+    font-size:28px;
     pointer-events:none;
     z-index:20;
+}
+
+/* インベントリ */
+#inventory{
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    width:600px;
+    max-width:90%;
+    background:rgba(20,20,20,0.95);
+    border:3px solid #666;
+    border-radius:12px;
+    padding:20px;
+    color:white;
+    display:none;
+    z-index:100;
+}
+
+#inventory h2{
+    margin-bottom:20px;
+    text-align:center;
+}
+
+.inventory-grid{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:12px;
+}
+
+.slot{
+    border:2px solid #777;
+    background:#2b2b2b;
+    aspect-ratio:1/1;
+    border-radius:8px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+    padding:6px;
+    font-size:14px;
 }
 </style>
 </head>
@@ -68,10 +110,29 @@ canvas{
     <div id="ui">
         W A S D = 移動<br>
         ← → ↑ ↓ = 視点移動<br>
-        E = ブロック破壊 / 鉱石採掘
+        R = ブロック破壊 / 鉱石採掘<br>
+        E = インベントリ
     </div>
 
     <div id="crosshair">+</div>
+
+    <div id="inventory">
+        <h2>インベントリ</h2>
+
+        <div class="inventory-grid">
+            <div class="slot" id="stoneSlot">
+                石 ×0
+            </div>
+
+            <div class="slot" id="oreSlot">
+                鉱石 ×0
+            </div>
+
+            <div class="slot"></div>
+            <div class="slot"></div>
+            <div class="slot"></div>
+        </div>
+    </div>
 
 </div>
 
@@ -96,7 +157,8 @@ container.appendChild(renderer.domElement);
 
 const camera = new THREE.PerspectiveCamera(
     75,
-    container.clientWidth / container.clientHeight,
+    container.clientWidth /
+    container.clientHeight,
     0.1,
     1000
 );
@@ -104,34 +166,77 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.set(0,2,5);
 
 // 光
-const ambientLight = new THREE.AmbientLight(0xffffff,0.8);
+const ambientLight =
+new THREE.AmbientLight(
+    0xffffff,
+    0.8
+);
+
 scene.add(ambientLight);
 
-const sun = new THREE.DirectionalLight(0xffffff,1);
+const sun =
+new THREE.DirectionalLight(
+    0xffffff,
+    1
+);
+
 sun.position.set(10,20,10);
 scene.add(sun);
 
-// 保存用
+// オブジェクト
 const breakableObjects = [];
-const oreObjects = [];
+const blockGeo =
+new THREE.BoxGeometry(1,1,1);
 
-// 地面ブロック
-const blockGeo = new THREE.BoxGeometry(1,1,1);
+// インベントリ
+const inventory = {
+    stone:0,
+    ore:0
+};
 
+const inventoryUI =
+document.getElementById("inventory");
+
+const stoneSlot =
+document.getElementById("stoneSlot");
+
+const oreSlot =
+document.getElementById("oreSlot");
+
+function updateInventoryUI(){
+
+    stoneSlot.textContent =
+        `石 ×${inventory.stone}`;
+
+    oreSlot.textContent =
+        `鉱石 ×${inventory.ore}`;
+}
+
+// 地面生成
 for(let x=-20;x<=20;x++){
+
     for(let z=-20;z<=20;z++){
 
-        const block = new THREE.Mesh(
+        const block =
+        new THREE.Mesh(
             blockGeo,
+
             new THREE.MeshLambertMaterial({
-                color:(x+z)%2===0
-                    ? 0x4CAF50
-                    : 0x3F9B45
+                color:
+                (x+z)%2===0
+                ?0x4CAF50
+                :0x3F9B45
             })
         );
 
-        block.position.set(x,0,z);
-        block.userData.type = "block";
+        block.position.set(
+            x,
+            0,
+            z
+        );
+
+        block.userData.type =
+        "block";
 
         scene.add(block);
         breakableObjects.push(block);
@@ -141,8 +246,10 @@ for(let x=-20;x<=20;x++){
 // 鉱石
 for(let i=0;i<20;i++){
 
-    const ore = new THREE.Mesh(
+    const ore =
+    new THREE.Mesh(
         blockGeo,
+
         new THREE.MeshLambertMaterial({
             color:0x00FFFF
         })
@@ -154,22 +261,48 @@ for(let i=0;i<20;i++){
         Math.random()*30-15
     );
 
-    ore.userData.type = "ore";
+    ore.userData.type =
+    "ore";
 
     scene.add(ore);
     breakableObjects.push(ore);
-    oreObjects.push(ore);
 }
 
 // キー入力
 const keys = {};
 
-window.addEventListener("keydown",(e)=>{
-    keys[e.key] = true;
+window.addEventListener(
+"keydown",
+(e)=>{
+
+    keys[e.key]=true;
+
+    // E = インベントリ
+    if(
+        e.key==="e" ||
+        e.key==="E"
+    ){
+
+        inventoryUI.style.display=
+        inventoryUI.style.display===
+        "block"
+        ?"none"
+        :"block";
+    }
+
+    // R = 破壊
+    if(
+        e.key==="r" ||
+        e.key==="R"
+    ){
+        breakBlock();
+    }
 });
 
-window.addEventListener("keyup",(e)=>{
-    keys[e.key] = false;
+window.addEventListener(
+"keyup",
+(e)=>{
+    keys[e.key]=false;
 });
 
 // 視点
@@ -196,12 +329,18 @@ function updateCameraRotation(){
         pitch -= speed;
     }
 
-    pitch = Math.max(
+    pitch =
+    Math.max(
         -1.4,
-        Math.min(1.4,pitch)
+        Math.min(
+            1.4,
+            pitch
+        )
     );
 
-    camera.rotation.order = "YXZ";
+    camera.rotation.order =
+    "YXZ";
+
     camera.rotation.y = yaw;
     camera.rotation.x = pitch;
 }
@@ -209,44 +348,68 @@ function updateCameraRotation(){
 // 移動
 function movePlayer(){
 
+    if(
+        inventoryUI.style.display
+        === "block"
+    ){
+        return;
+    }
+
     const speed = 0.12;
 
-    const forward = new THREE.Vector3(
+    const forward =
+    new THREE.Vector3(
         Math.sin(yaw),
         0,
         Math.cos(yaw)
     );
 
-    const right = new THREE.Vector3(
+    const right =
+    new THREE.Vector3(
         Math.cos(yaw),
         0,
         -Math.sin(yaw)
     );
 
-    // W/S 修正済み
-    if(keys["w"] || keys["W"]){
-        camera.position.addScaledVector(
+    if(
+        keys["w"]||
+        keys["W"]
+    ){
+        camera.position
+        .addScaledVector(
             forward,
             -speed
         );
     }
 
-    if(keys["s"] || keys["S"]){
-        camera.position.addScaledVector(
+    if(
+        keys["s"]||
+        keys["S"]
+    ){
+        camera.position
+        .addScaledVector(
             forward,
             speed
         );
     }
 
-    if(keys["a"] || keys["A"]){
-        camera.position.addScaledVector(
+    if(
+        keys["a"]||
+        keys["A"]
+    ){
+        camera.position
+        .addScaledVector(
             right,
             -speed
         );
     }
 
-    if(keys["d"] || keys["D"]){
-        camera.position.addScaledVector(
+    if(
+        keys["d"]||
+        keys["D"]
+    ){
+        camera.position
+        .addScaledVector(
             right,
             speed
         );
@@ -255,76 +418,102 @@ function movePlayer(){
     camera.position.y = 2;
 }
 
-// レイキャスト
-const raycaster = new THREE.Raycaster();
+// ブロック破壊
+const raycaster =
+new THREE.Raycaster();
 
-// Eキーで破壊
-window.addEventListener("keydown",(e)=>{
-
-    if(e.key !== "e" && e.key !== "E"){
-        return;
-    }
+function breakBlock(){
 
     raycaster.setFromCamera(
         new THREE.Vector2(0,0),
         camera
     );
 
-    const hit = raycaster.intersectObjects(
+    const hit =
+    raycaster.intersectObjects(
         breakableObjects
     );
 
-    if(hit.length > 0){
-
-        const target = hit[0].object;
-
-        if(hit[0].distance < 6){
-
-            if(target.userData.type === "ore"){
-                console.log("鉱石採掘！");
-            }
-
-            if(target.userData.type === "block"){
-                console.log("ブロック破壊！");
-            }
-
-            scene.remove(target);
-
-            const index =
-                breakableObjects.indexOf(target);
-
-            if(index !== -1){
-                breakableObjects.splice(index,1);
-            }
-        }
+    if(hit.length<=0){
+        return;
     }
-});
+
+    const target =
+    hit[0].object;
+
+    if(hit[0].distance>6){
+        return;
+    }
+
+    if(
+        target.userData.type
+        === "block"
+    ){
+        inventory.stone++;
+    }
+
+    if(
+        target.userData.type
+        === "ore"
+    ){
+        inventory.ore++;
+    }
+
+    updateInventoryUI();
+
+    scene.remove(target);
+
+    const index =
+    breakableObjects.indexOf(
+        target
+    );
+
+    if(index!==-1){
+        breakableObjects.splice(
+            index,
+            1
+        );
+    }
+}
 
 // リサイズ
 function resize(){
 
-    const w = container.clientWidth;
-    const h = container.clientHeight;
+    const w =
+    container.clientWidth;
+
+    const h =
+    container.clientHeight;
 
     renderer.setSize(w,h);
 
     camera.aspect = w/h;
+
     camera.updateProjectionMatrix();
 }
 
-window.addEventListener("resize",resize);
+window.addEventListener(
+"resize",
+resize
+);
 
-// メインループ
+// ループ
 function animate(){
 
-    requestAnimationFrame(animate);
+    requestAnimationFrame(
+        animate
+    );
 
     updateCameraRotation();
     movePlayer();
 
-    renderer.render(scene,camera);
+    renderer.render(
+        scene,
+        camera
+    );
 }
 
+updateInventoryUI();
 animate();
 
 </script>
