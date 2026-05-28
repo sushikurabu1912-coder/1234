@@ -42,22 +42,45 @@ canvas{
     top:10px;
     left:10px;
     color:white;
-    background:rgba(0,0,0,0.55);
-    padding:10px;
+    background:rgba(0,0,0,0.6);
+    padding:12px;
     border-radius:10px;
     z-index:10;
-    line-height:1.6;
+    line-height:1.7;
 }
 
 #crosshair{
     position:absolute;
     left:50%;
     top:50%;
-    transform:translate(-50%, -50%);
+    transform:translate(-50%,-50%);
     color:white;
     font-size:28px;
+    z-index:30;
     pointer-events:none;
-    z-index:20;
+}
+
+/* 採掘バー */
+#miningContainer{
+    position:absolute;
+    left:50%;
+    top:calc(50% + 30px);
+    transform:translateX(-50%);
+    width:220px;
+    height:20px;
+    border:2px solid white;
+    background:rgba(0,0,0,0.5);
+    border-radius:999px;
+    overflow:hidden;
+    display:none;
+    z-index:40;
+}
+
+#miningBar{
+    width:0%;
+    height:100%;
+    background:#59ff71;
+    transition:width 0.03s linear;
 }
 
 /* インベントリ */
@@ -66,39 +89,38 @@ canvas{
     left:50%;
     top:50%;
     transform:translate(-50%,-50%);
-    width:600px;
-    max-width:90%;
-    background:rgba(20,20,20,0.95);
+    width:700px;
+    max-width:92%;
+    background:rgba(20,20,20,0.96);
     border:3px solid #666;
     border-radius:12px;
     padding:20px;
-    color:white;
     display:none;
     z-index:100;
+    color:white;
 }
 
 #inventory h2{
-    margin-bottom:20px;
     text-align:center;
+    margin-bottom:16px;
 }
 
 .inventory-grid{
     display:grid;
-    grid-template-columns:repeat(5,1fr);
+    grid-template-columns:repeat(4,1fr);
     gap:12px;
 }
 
 .slot{
-    border:2px solid #777;
+    border:2px solid #666;
+    border-radius:10px;
     background:#2b2b2b;
-    aspect-ratio:1/1;
-    border-radius:8px;
+    min-height:90px;
     display:flex;
-    justify-content:center;
     align-items:center;
+    justify-content:center;
     text-align:center;
-    padding:6px;
-    font-size:14px;
+    padding:10px;
 }
 </style>
 </head>
@@ -110,27 +132,27 @@ canvas{
     <div id="ui">
         W A S D = 移動<br>
         ← → ↑ ↓ = 視点移動<br>
-        R = ブロック破壊 / 鉱石採掘<br>
+        R長押し = 採掘<br>
         E = インベントリ
     </div>
 
     <div id="crosshair">+</div>
 
+    <div id="miningContainer">
+        <div id="miningBar"></div>
+    </div>
+
     <div id="inventory">
         <h2>インベントリ</h2>
 
         <div class="inventory-grid">
-            <div class="slot" id="stoneSlot">
-                石 ×0
-            </div>
-
-            <div class="slot" id="oreSlot">
-                鉱石 ×0
-            </div>
-
-            <div class="slot"></div>
-            <div class="slot"></div>
-            <div class="slot"></div>
+            <div class="slot" id="stoneSlot"></div>
+            <div class="slot" id="coalSlot"></div>
+            <div class="slot" id="copperSlot"></div>
+            <div class="slot" id="ironSlot"></div>
+            <div class="slot" id="goldSlot"></div>
+            <div class="slot" id="diamondSlot"></div>
+            <div class="slot" id="scienceSlot"></div>
         </div>
     </div>
 
@@ -166,13 +188,12 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.set(0,2,5);
 
 // 光
-const ambientLight =
-new THREE.AmbientLight(
-    0xffffff,
-    0.8
+scene.add(
+    new THREE.AmbientLight(
+        0xffffff,
+        0.8
+    )
 );
-
-scene.add(ambientLight);
 
 const sun =
 new THREE.DirectionalLight(
@@ -183,44 +204,53 @@ new THREE.DirectionalLight(
 sun.position.set(10,20,10);
 scene.add(sun);
 
-// オブジェクト
-const breakableObjects = [];
-const blockGeo =
-new THREE.BoxGeometry(1,1,1);
-
 // インベントリ
 const inventory = {
     stone:0,
-    ore:0
+    coal:0,
+    copper:0,
+    iron:0,
+    gold:0,
+    diamond:0,
+    science:0
 };
-
-const inventoryUI =
-document.getElementById("inventory");
-
-const stoneSlot =
-document.getElementById("stoneSlot");
-
-const oreSlot =
-document.getElementById("oreSlot");
 
 function updateInventoryUI(){
 
     stoneSlot.textContent =
         `石 ×${inventory.stone}`;
 
-    oreSlot.textContent =
-        `鉱石 ×${inventory.ore}`;
+    coalSlot.textContent =
+        `石炭 ×${inventory.coal}`;
+
+    copperSlot.textContent =
+        `銅 ×${inventory.copper}`;
+
+    ironSlot.textContent =
+        `鉄 ×${inventory.iron}`;
+
+    goldSlot.textContent =
+        `金 ×${inventory.gold}`;
+
+    diamondSlot.textContent =
+        `ダイヤ ×${inventory.diamond}`;
+
+    scienceSlot.textContent =
+        `科学鉱石 ×${inventory.science}`;
 }
 
-// 地面生成
-for(let x=-20;x<=20;x++){
+const blockGeo =
+new THREE.BoxGeometry(1,1,1);
 
+const breakableObjects=[];
+
+// 地面
+for(let x=-20;x<=20;x++){
     for(let z=-20;z<=20;z++){
 
         const block =
         new THREE.Mesh(
             blockGeo,
-
             new THREE.MeshLambertMaterial({
                 color:
                 (x+z)%2===0
@@ -229,152 +259,142 @@ for(let x=-20;x<=20;x++){
             })
         );
 
-        block.position.set(
-            x,
-            0,
-            z
-        );
+        block.position.set(x,0,z);
 
-        block.userData.type =
-        "block";
+        block.userData={
+            type:"stone",
+            mineTime:400
+        };
 
         scene.add(block);
         breakableObjects.push(block);
     }
 }
 
-// 鉱石
-for(let i=0;i<20;i++){
+// 鉱石生成
+function addOre(
+    color,
+    type,
+    mineTime,
+    amount=8
+){
+    for(let i=0;i<amount;i++){
 
-    const ore =
-    new THREE.Mesh(
-        blockGeo,
+        const ore =
+        new THREE.Mesh(
+            blockGeo,
+            new THREE.MeshLambertMaterial({
+                color
+            })
+        );
 
-        new THREE.MeshLambertMaterial({
-            color:0x00FFFF
-        })
-    );
+        ore.position.set(
+            Math.random()*36-18,
+            1,
+            Math.random()*36-18
+        );
 
-    ore.position.set(
-        Math.random()*30-15,
-        1,
-        Math.random()*30-15
-    );
+        ore.userData={
+            type,
+            mineTime
+        };
 
-    ore.userData.type =
-    "ore";
-
-    scene.add(ore);
-    breakableObjects.push(ore);
+        scene.add(ore);
+        breakableObjects.push(ore);
+    }
 }
 
-// キー入力
-const keys = {};
+addOre(0x333333,"coal",600);
+addOre(0xb87333,"copper",1000);
+addOre(0xc0c0c0,"iron",1800);
+addOre(0xffd700,"gold",2200);
+addOre(0x4de1ff,"diamond",3500);
+addOre(0x00ffff,"science",4000);
+
+// キー
+const keys={};
 
 window.addEventListener(
 "keydown",
-(e)=>{
+e=>{
 
     keys[e.key]=true;
 
-    // E = インベントリ
     if(
-        e.key==="e" ||
+        e.key==="e"||
         e.key==="E"
     ){
+        const inv =
+        document.getElementById(
+            "inventory"
+        );
 
-        inventoryUI.style.display=
-        inventoryUI.style.display===
-        "block"
+        inv.style.display=
+        inv.style.display==="block"
         ?"none"
         :"block";
-    }
-
-    // R = 破壊
-    if(
-        e.key==="r" ||
-        e.key==="R"
-    ){
-        breakBlock();
     }
 });
 
 window.addEventListener(
 "keyup",
-(e)=>{
+e=>{
     keys[e.key]=false;
 });
 
 // 視点
-let yaw = 0;
-let pitch = 0;
+let yaw=0;
+let pitch=0;
 
 function updateCameraRotation(){
 
-    const speed = 0.02;
+    const speed=0.02;
 
-    if(keys["ArrowLeft"]){
-        yaw += speed;
-    }
+    if(keys["ArrowLeft"])
+        yaw+=speed;
 
-    if(keys["ArrowRight"]){
-        yaw -= speed;
-    }
+    if(keys["ArrowRight"])
+        yaw-=speed;
 
-    if(keys["ArrowUp"]){
-        pitch += speed;
-    }
+    if(keys["ArrowUp"])
+        pitch+=speed;
 
-    if(keys["ArrowDown"]){
-        pitch -= speed;
-    }
+    if(keys["ArrowDown"])
+        pitch-=speed;
 
-    pitch =
-    Math.max(
+    pitch=Math.max(
         -1.4,
-        Math.min(
-            1.4,
-            pitch
-        )
+        Math.min(1.4,pitch)
     );
 
-    camera.rotation.order =
+    camera.rotation.order=
     "YXZ";
 
-    camera.rotation.y = yaw;
-    camera.rotation.x = pitch;
+    camera.rotation.y=yaw;
+    camera.rotation.x=pitch;
 }
 
 // 移動
 function movePlayer(){
 
-    if(
-        inventoryUI.style.display
-        === "block"
-    ){
-        return;
-    }
+    const speed=0.12;
 
-    const speed = 0.12;
-
-    const forward =
+    const forward=
     new THREE.Vector3(
         Math.sin(yaw),
         0,
         Math.cos(yaw)
     );
 
-    const right =
+    const right=
     new THREE.Vector3(
         Math.cos(yaw),
         0,
         -Math.sin(yaw)
     );
 
-    if(
-        keys["w"]||
-        keys["W"]
-    ){
+    if(keys["w"]||
+       keys["W"]){
         camera.position
         .addScaledVector(
             forward,
@@ -382,10 +402,8 @@ function movePlayer(){
         );
     }
 
-    if(
-        keys["s"]||
-        keys["S"]
-    ){
+    if(keys["s"]||
+       keys["S"]){
         camera.position
         .addScaledVector(
             forward,
@@ -393,10 +411,8 @@ function movePlayer(){
         );
     }
 
-    if(
-        keys["a"]||
-        keys["A"]
-    ){
+    if(keys["a"]||
+       keys["A"]){
         camera.position
         .addScaledVector(
             right,
@@ -404,10 +420,8 @@ function movePlayer(){
         );
     }
 
-    if(
-        keys["d"]||
-        keys["D"]
-    ){
+    if(keys["d"]||
+       keys["D"]){
         camera.position
         .addScaledVector(
             right,
@@ -415,87 +429,133 @@ function movePlayer(){
         );
     }
 
-    camera.position.y = 2;
+    camera.position.y=2;
 }
 
-// ブロック破壊
+// 採掘
 const raycaster =
 new THREE.Raycaster();
 
-function breakBlock(){
+const miningBar =
+document.getElementById(
+    "miningBar"
+);
+
+const miningContainer=
+document.getElementById(
+    "miningContainer"
+);
+
+let mining=false;
+let miningTarget=null;
+let miningStart=0;
+
+function handleMining(){
+
+    if(
+        !keys["r"] &&
+        !keys["R"]
+    ){
+        mining=false;
+        miningTarget=null;
+        miningBar.style.width="0%";
+        miningContainer.style.display=
+        "none";
+        return;
+    }
 
     raycaster.setFromCamera(
         new THREE.Vector2(0,0),
         camera
     );
 
-    const hit =
+    const hit=
     raycaster.intersectObjects(
         breakableObjects
     );
 
-    if(hit.length<=0){
+    if(hit.length===0)
         return;
-    }
 
-    const target =
+    const target=
     hit[0].object;
 
-    if(hit[0].distance>6){
+    if(hit[0].distance>6)
         return;
-    }
 
     if(
-        target.userData.type
-        === "block"
+        !mining||
+        miningTarget!==target
     ){
-        inventory.stone++;
+        mining=true;
+        miningTarget=target;
+        miningStart=
+        performance.now();
+
+        miningContainer.style.display=
+        "block";
     }
 
-    if(
-        target.userData.type
-        === "ore"
-    ){
-        inventory.ore++;
-    }
+    const elapsed=
+        performance.now()
+        -miningStart;
 
-    updateInventoryUI();
+    const progress=
+        elapsed/
+        target.userData.mineTime;
 
-    scene.remove(target);
+    miningBar.style.width=
+        `${Math.min(
+            progress*100,
+            100
+        )}%`;
 
-    const index =
-    breakableObjects.indexOf(
-        target
-    );
+    if(progress>=1){
 
-    if(index!==-1){
-        breakableObjects.splice(
-            index,
-            1
-        );
+        inventory[
+            target.userData.type
+        ]++;
+
+        updateInventoryUI();
+
+        scene.remove(target);
+
+        const index=
+        breakableObjects
+        .indexOf(target);
+
+        if(index!==-1){
+            breakableObjects.splice(
+                index,
+                1
+            );
+        }
+
+        mining=false;
+        miningTarget=null;
+        miningBar.style.width=
+        "0%";
+
+        miningContainer.style.display=
+        "none";
     }
 }
 
 // リサイズ
-function resize(){
-
-    const w =
-    container.clientWidth;
-
-    const h =
-    container.clientHeight;
-
-    renderer.setSize(w,h);
-
-    camera.aspect = w/h;
-
-    camera.updateProjectionMatrix();
-}
-
 window.addEventListener(
 "resize",
-resize
-);
+()=>{
+    renderer.setSize(
+        container.clientWidth,
+        container.clientHeight
+    );
+
+    camera.aspect=
+    container.clientWidth/
+    container.clientHeight;
+
+    camera.updateProjectionMatrix();
+});
 
 // ループ
 function animate(){
@@ -506,6 +566,7 @@ function animate(){
 
     updateCameraRotation();
     movePlayer();
+    handleMining();
 
     renderer.render(
         scene,
@@ -515,7 +576,6 @@ function animate(){
 
 updateInventoryUI();
 animate();
-
 </script>
 
 </body>
