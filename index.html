@@ -2,514 +2,315 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Science Explorer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuantumCraft</title>
 
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
+
 body{
-    background:#111;
+    margin:0;
     overflow:hidden;
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    font-family:Arial,sans-serif;
-}
-#game{
-    width:min(100vw,calc(100vh*16/9));
-    aspect-ratio:16/9;
-    position:relative;
-    overflow:hidden;
-    border:4px solid #333;
-    background:#000;
-}
-canvas{display:block;width:100%;height:100%}
-
-#crosshair{
-    position:absolute;
-    left:50%;
-    top:50%;
-    transform:translate(-50%,-50%);
-    color:#fff;
-    font-size:18px;
-    pointer-events:none;
-    z-index:10;
+    background:#0f172a;
+    font-family:sans-serif;
+    color:white;
 }
 
-#help{
+canvas{
+    display:block;
+    background:#1e293b;
+}
+
+#ui{
     position:absolute;
     top:10px;
     left:10px;
-    color:#fff;
-    background:#0009;
-    padding:10px;
-    border:2px solid #555;
     z-index:10;
-    line-height:1.5;
+    background:rgba(0,0,0,0.6);
+    padding:12px;
+    border-radius:10px;
+    width:240px;
 }
 
-#targetInfo{
-    position:absolute;
-    left:50%;
-    top:calc(50% + 55px);
-    transform:translateX(-50%);
-    color:#fff;
-    background:#0009;
-    padding:8px 14px;
-    border:2px solid #555;
-    display:none;
-    z-index:10;
+.bar{
+    margin:5px 0;
 }
 
-#ring{
-    position:absolute;
-    left:50%;
-    top:50%;
-    width:70px;
-    height:70px;
-    transform:translate(-50%,-50%);
-    border-radius:50%;
-    display:none;
-    pointer-events:none;
+.help{
+    margin-top:10px;
+    font-size:13px;
+    color:#cbd5e1;
 }
 
-#hotbar{
-    position:absolute;
-    bottom:15px;
-    left:50%;
-    transform:translateX(-50%);
-    display:flex;
-    gap:4px;
-    z-index:10;
-}
-
-.slot{
-    width:64px;
-    height:64px;
-    background:#333d;
-    border:3px solid #777;
-    color:white;
-    position:relative;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    font-size:12px;
-    text-align:center;
-}
-
-.slot span{
-    position:absolute;
-    bottom:4px;
-    right:4px;
-}
-
-#inventory{
-    position:absolute;
-    inset:0;
-    background:#000c;
-    display:none;
-    justify-content:center;
-    align-items:center;
-    z-index:50;
-}
-
-#inventoryBox{
-    width:700px;
-    max-width:90%;
-    background:#1d1d1d;
-    border:4px solid #666;
-    padding:20px;
-}
-
-#inventoryGrid{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:10px;
-}
-
-.item{
-    height:90px;
-    background:#333;
-    border:2px solid #777;
-    color:white;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-}
 </style>
 </head>
 <body>
 
-<div id="game">
-    <div id="help">
-        WASD = 移動<br>
-        矢印キー = 視点<br>
-        R長押し = 採掘<br>
-        E = インベントリ
-    </div>
+<div id="ui">
+    <h2>QuantumCraft</h2>
 
-    <div id="crosshair">+</div>
-    <div id="ring"></div>
-    <div id="targetInfo"></div>
+    <div class="bar">⛏ 鉄: <span id="iron">0</span></div>
+    <div class="bar">🔥 熱: <span id="heat">0</span></div>
+    <div class="bar">⚡ 電力: <span id="power">0</span></div>
+    <div class="bar">🧪 科学: <span id="science">0</span></div>
 
-    <div id="hotbar"></div>
-
-    <div id="inventory">
-        <div id="inventoryBox">
-            <h2 style="color:white;text-align:center;margin-bottom:12px;">
-                インベントリ
-            </h2>
-            <div id="inventoryGrid"></div>
-        </div>
+    <div class="help">
+        WASD: 移動<br>
+        SPACE: 採掘<br>
+        E: 石炭燃焼<br>
+        F: 発電<br>
+        R: 研究
     </div>
 </div>
 
-<script type="module">
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.161/build/three.module.js";
+<canvas id="game"></canvas>
 
-const game=document.getElementById("game");
-const ring=document.getElementById("ring");
-const info=document.getElementById("targetInfo");
-const hotbar=document.getElementById("hotbar");
-const inventoryUI=document.getElementById("inventory");
-const inventoryGrid=document.getElementById("inventoryGrid");
+<script>
 
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x87ceeb);
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(game.clientWidth,game.clientHeight);
-game.appendChild(renderer.domElement);
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-const camera=new THREE.PerspectiveCamera(
-75,
-game.clientWidth/game.clientHeight,
-0.1,
-1000
-);
+window.addEventListener("resize", () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
 
-camera.position.set(0,6,10);
+const TILE = 32;
+const MAP_W = 100;
+const MAP_H = 100;
 
-scene.add(new THREE.AmbientLight(0xffffff,0.85));
+const map = [];
 
-const sun=new THREE.DirectionalLight(0xffffff,1);
-sun.position.set(30,40,20);
-scene.add(sun);
+for(let y=0;y<MAP_H;y++){
 
-const geo=new THREE.BoxGeometry(1,1,1);
-const objects=[];
+    const row = [];
 
-const oreData={
-stone:{name:"石",color:0x777777,time:500},
-coal:{name:"石炭",color:0x222222,time:700},
-copper:{name:"銅",color:0xb87333,time:1200},
-iron:{name:"鉄",color:0xc0c0c0,time:1800},
-gold:{name:"金",color:0xffd700,time:2500},
-diamond:{name:"ダイヤ",color:0x00e5ff,time:3400},
-science:{name:"科学鉱石",color:0x00ffff,time:4500}
+    for(let x=0;x<MAP_W;x++){
+
+        let type = "grass";
+
+        const r = Math.random();
+
+        if(r < 0.08){
+            type = "iron";
+        }
+        else if(r < 0.12){
+            type = "coal";
+        }
+
+        row.push(type);
+    }
+
+    map.push(row);
+}
+
+const player = {
+    x:10,
+    y:10,
+    speed:0.12
 };
 
-const inventory={};
-for(const k in oreData){
-    inventory[k]=0;
-}
+const state = {
+    iron:0,
+    heat:0,
+    power:0,
+    science:0
+};
+
+const keys = {};
+
+window.addEventListener("keydown",(e)=>{
+    keys[e.key.toLowerCase()] = true;
+});
+
+window.addEventListener("keyup",(e)=>{
+    keys[e.key.toLowerCase()] = false;
+});
 
 function updateUI(){
-    hotbar.innerHTML="";
-    inventoryGrid.innerHTML="";
 
-    for(const key in oreData){
-
-        const slot=document.createElement("div");
-        slot.className="slot";
-        slot.innerHTML=
-        `${oreData[key].name}<span>${inventory[key]}</span>`;
-        hotbar.appendChild(slot);
-
-        const item=document.createElement("div");
-        item.className="item";
-        item.textContent=
-        `${oreData[key].name} ×${inventory[key]}`;
-        inventoryGrid.appendChild(item);
-    }
+    document.getElementById("iron").textContent = state.iron;
+    document.getElementById("heat").textContent = state.heat;
+    document.getElementById("power").textContent = state.power;
+    document.getElementById("science").textContent = state.science;
 }
 
-function addBlock(x,y,z,color,type,time,name){
-    const mesh=new THREE.Mesh(
-        geo,
-        new THREE.MeshLambertMaterial({color})
-    );
+function update(){
 
-    mesh.position.set(x,y,z);
-    mesh.userData={type,time,name};
+    if(keys["w"]) player.y -= player.speed;
+    if(keys["s"]) player.y += player.speed;
+    if(keys["a"]) player.x -= player.speed;
+    if(keys["d"]) player.x += player.speed;
 
-    scene.add(mesh);
-    objects.push(mesh);
+    player.x = Math.max(0, Math.min(MAP_W-1, player.x));
+    player.y = Math.max(0, Math.min(MAP_H-1, player.y));
 }
-
-function terrainHeight(x,z){
-    return Math.floor(
-        Math.sin(x*0.18)*2+
-        Math.cos(z*0.17)*2+4
-    );
-}
-
-// 洞窟入口位置
-const caveX=12;
-const caveZ=0;
-const caveWidth=5;
-
-for(let x=-40;x<=40;x++){
-for(let z=-40;z<=40;z++){
-
-    const h=terrainHeight(x,z);
-
-    for(let y=0;y<h;y++){
-
-        // 洞窟入口（LEGO Fortnite風）
-        const nearEntrance=
-        x>caveX-caveWidth &&
-        x<caveX+caveWidth &&
-        z>-3 && z<3 &&
-        y>1 && y<h;
-
-        // 地下通路
-        const caveTunnel=
-        x>caveX-6 &&
-        x<35 &&
-        z>-6 && z<6 &&
-        y>1 && y<6;
-
-        if(nearEntrance || caveTunnel){
-            continue;
-        }
-
-        let color=0x777777;
-        let type="stone";
-
-        if(y===h-1){
-            color=0x49aa4c;
-        }else if(y>h-4){
-            color=0x7b5a3a;
-        }
-
-        addBlock(
-            x,y,z,
-            color,
-            type,
-            oreData.stone.time,
-            oreData.stone.name
-        );
-    }
-}
-}
-
-// 鉱石生成（洞窟内部多め）
-function spawnOre(type,count,rangeX1,rangeX2){
-
-for(let i=0;i<count;i++){
-
-    const x=Math.random()*
-    (rangeX2-rangeX1)+rangeX1;
-
-    const z=Math.random()*10-5;
-    const y=Math.random()*4+1;
-
-    const o=oreData[type];
-
-    addBlock(
-        x,y,z,
-        o.color,
-        type,
-        o.time,
-        o.name
-    );
-}
-}
-
-spawnOre("coal",20,8,34);
-spawnOre("copper",16,8,34);
-spawnOre("iron",12,10,35);
-spawnOre("gold",8,12,35);
-spawnOre("diamond",6,15,35);
-spawnOre("science",4,18,35);
-
-// 入力
-const keys={};
-
-window.addEventListener("keydown",e=>{
-    keys[e.key]=true;
-
-    if(e.key==="e"||e.key==="E"){
-        inventoryUI.style.display=
-        inventoryUI.style.display==="flex"
-        ?"none":"flex";
-    }
-});
-
-window.addEventListener("keyup",e=>{
-    keys[e.key]=false;
-});
-
-// 視点
-let yaw=0,pitch=0;
-
-function look(){
-
-    const s=0.02;
-
-    if(keys["ArrowLeft"])yaw+=s;
-    if(keys["ArrowRight"])yaw-=s;
-    if(keys["ArrowUp"])pitch+=s;
-    if(keys["ArrowDown"])pitch-=s;
-
-    pitch=Math.max(-1.2,Math.min(1.2,pitch));
-
-    camera.rotation.order="YXZ";
-    camera.rotation.y=yaw;
-    camera.rotation.x=pitch;
-}
-
-// 移動
-function move(){
-
-    if(inventoryUI.style.display==="flex"){
-        return;
-    }
-
-    const speed=0.12;
-
-    const forward=
-    new THREE.Vector3(
-        Math.sin(yaw),0,Math.cos(yaw)
-    );
-
-    const right=
-    new THREE.Vector3(
-        Math.cos(yaw),0,-Math.sin(yaw)
-    );
-
-    if(keys.w||keys.W)
-        camera.position.addScaledVector(forward,-speed);
-
-    if(keys.s||keys.S)
-        camera.position.addScaledVector(forward,speed);
-
-    if(keys.a||keys.A)
-        camera.position.addScaledVector(right,-speed);
-
-    if(keys.d||keys.D)
-        camera.position.addScaledVector(right,speed);
-
-    const ground=
-    terrainHeight(
-        Math.round(camera.position.x),
-        Math.round(camera.position.z)
-    );
-
-    // 洞窟内は低い高さ
-    if(
-        camera.position.x>8 &&
-        camera.position.x<35 &&
-        Math.abs(camera.position.z)<6
-    ){
-        camera.position.y=3;
-        scene.background=
-        new THREE.Color(0x222222);
-    }else{
-        camera.position.y=ground+2;
-        scene.background=
-        new THREE.Color(0x87ceeb);
-    }
-}
-
-const raycaster=new THREE.Raycaster();
-let miningTarget=null;
-let miningStart=0;
 
 function mine(){
 
-    raycaster.setFromCamera(
-        new THREE.Vector2(0,0),
-        camera
-    );
+    const tx = Math.floor(player.x);
+    const ty = Math.floor(player.y);
 
-    const hit=
-    raycaster.intersectObjects(objects);
+    const tile = map[ty][tx];
 
-    if(!hit.length || hit[0].distance>6){
-        ring.style.display="none";
-        info.style.display="none";
-        miningTarget=null;
-        return;
+    if(tile === "iron"){
+        state.iron += 1;
+        map[ty][tx] = "grass";
     }
 
-    const target=hit[0].object;
-
-    info.style.display="block";
-    info.innerHTML=
-    `${target.userData.name}<br>
-    ${(target.userData.time/1000).toFixed(1)}秒`;
-
-    if(!(keys.r||keys.R)){
-        ring.style.display="none";
-        miningTarget=null;
-        return;
+    if(tile === "coal"){
+        state.heat += 10;
+        map[ty][tx] = "grass";
     }
 
-    if(miningTarget!==target){
-        miningTarget=target;
-        miningStart=performance.now();
+    updateUI();
+}
+
+function burnCoal(){
+
+    if(state.iron >= 1){
+        state.iron -= 1;
+        state.heat += 20;
     }
 
-    const p=
-    (performance.now()-miningStart)/
-    target.userData.time;
+    updateUI();
+}
 
-    ring.style.display="block";
-    ring.style.background=
-    `conic-gradient(
-        #fff ${p*360}deg,
-        rgba(255,255,255,.12) 0deg
-    )`;
+function generatePower(){
 
-    if(p>=1){
+    if(state.heat >= 10){
+        state.heat -= 10;
+        state.power += 15;
+    }
 
-        inventory[target.userData.type]++;
-        updateUI();
+    updateUI();
+}
 
-        scene.remove(target);
-        objects.splice(objects.indexOf(target),1);
+function research(){
 
-        miningTarget=null;
-        ring.style.display="none";
+    if(state.power >= 20){
+
+        state.power -= 20;
+        state.science += 1;
+
+        if(state.science % 5 === 0){
+            player.speed += 0.02;
+        }
+    }
+
+    updateUI();
+}
+
+window.addEventListener("keydown",(e)=>{
+
+    if(e.code === "Space"){
+        mine();
+    }
+
+    if(e.key.toLowerCase() === "e"){
+        burnCoal();
+    }
+
+    if(e.key.toLowerCase() === "f"){
+        generatePower();
+    }
+
+    if(e.key.toLowerCase() === "r"){
+        research();
+    }
+});
+
+function drawMap(){
+
+    const camX = player.x * TILE - canvas.width/2;
+    const camY = player.y * TILE - canvas.height/2;
+
+    const startX = Math.floor(camX / TILE);
+    const startY = Math.floor(camY / TILE);
+
+    const endX = startX + Math.ceil(canvas.width / TILE) + 2;
+    const endY = startY + Math.ceil(canvas.height / TILE) + 2;
+
+    for(let y=startY;y<endY;y++){
+
+        if(y < 0 || y >= MAP_H) continue;
+
+        for(let x=startX;x<endX;x++){
+
+            if(x < 0 || x >= MAP_W) continue;
+
+            const tile = map[y][x];
+
+            let color = "#22c55e";
+
+            if(tile === "iron") color = "#94a3b8";
+            if(tile === "coal") color = "#1e293b";
+
+            ctx.fillStyle = color;
+
+            ctx.fillRect(
+                x*TILE - camX,
+                y*TILE - camY,
+                TILE-1,
+                TILE-1
+            );
+        }
     }
 }
 
-window.addEventListener("resize",()=>{
-    renderer.setSize(
-        game.clientWidth,
-        game.clientHeight
+function drawPlayer(){
+
+    ctx.fillStyle = "#3b82f6";
+
+    ctx.fillRect(
+        canvas.width/2 - 12,
+        canvas.height/2 - 12,
+        24,
+        24
     );
+}
 
-    camera.aspect=
-    game.clientWidth/game.clientHeight;
+function drawScienceMachine(){
 
-    camera.updateProjectionMatrix();
-});
+    const x = 200;
+    const y = 200;
 
-function animate(){
-    requestAnimationFrame(animate);
-    look();
-    move();
-    mine();
-    renderer.render(scene,camera);
+    ctx.fillStyle = "#475569";
+
+    ctx.fillRect(x,y,80,80);
+
+    ctx.fillStyle = "#facc15";
+
+    ctx.beginPath();
+    ctx.arc(x+40,y+40,25,0,Math.PI*2);
+    ctx.fill();
+
+    ctx.fillStyle = "white";
+    ctx.fillText("発電機",x+10,y+105);
+}
+
+function render(){
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    drawMap();
+    drawPlayer();
+    drawScienceMachine();
+}
+
+function loop(){
+
+    update();
+    render();
+
+    requestAnimationFrame(loop);
 }
 
 updateUI();
-animate();
-</script>
+loop();
 
+</script>
 </body>
 </html>
