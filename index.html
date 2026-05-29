@@ -25,20 +25,26 @@ canvas{
     top:10px;
     left:10px;
     z-index:10;
-    background:rgba(0,0,0,0.6);
-    padding:12px;
-    border-radius:10px;
-    width:240px;
+    background:rgba(0,0,0,0.65);
+    padding:14px;
+    border-radius:12px;
+    width:260px;
 }
 
 .bar{
-    margin:5px 0;
+    margin:6px 0;
 }
 
 .help{
-    margin-top:10px;
+    margin-top:12px;
     font-size:13px;
     color:#cbd5e1;
+    line-height:1.6;
+}
+
+hr{
+    border:1px solid #334155;
+    margin:12px 0;
 }
 
 </style>
@@ -46,20 +52,33 @@ canvas{
 <body>
 
 <div id="ui">
+
     <h2>QuantumCraft</h2>
 
-    <div class="bar">⛏ 鉄: <span id="iron">0</span></div>
+    <div class="bar">⛓ 鉄: <span id="iron">0</span></div>
+    <div class="bar">🪨 石炭: <span id="coal">0</span></div>
     <div class="bar">🔥 熱: <span id="heat">0</span></div>
     <div class="bar">⚡ 電力: <span id="power">0</span></div>
     <div class="bar">🧪 科学: <span id="science">0</span></div>
 
+    <hr>
+
+    <div class="bar">🏭 かまど: <span id="furnace">0</span></div>
+    <div class="bar">⚙ 発電機: <span id="generator">0</span></div>
+
     <div class="help">
-        WASD: 移動<br>
-        SPACE: 採掘<br>
-        E: 石炭燃焼<br>
-        F: 発電<br>
-        R: 研究
+
+        WASD : 移動<br>
+        SPACE : 採掘<br><br>
+
+        C : かまど作成<br>
+        G : 発電機作成<br>
+        B : かまど使用<br>
+        F : 発電<br>
+        R : 研究
+
     </div>
+
 </div>
 
 <canvas id="game"></canvas>
@@ -72,9 +91,11 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-window.addEventListener("resize", () => {
+window.addEventListener("resize",()=>{
+
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+
 });
 
 const TILE = 32;
@@ -96,7 +117,7 @@ for(let y=0;y<MAP_H;y++){
         if(r < 0.08){
             type = "iron";
         }
-        else if(r < 0.12){
+        else if(r < 0.15){
             type = "coal";
         }
 
@@ -107,16 +128,24 @@ for(let y=0;y<MAP_H;y++){
 }
 
 const player = {
+
     x:10,
     y:10,
     speed:0.12
+
 };
 
 const state = {
+
     iron:0,
+    coal:0,
     heat:0,
     power:0,
-    science:0
+    science:0,
+
+    furnace:0,
+    generator:0
+
 };
 
 const keys = {};
@@ -132,9 +161,13 @@ window.addEventListener("keyup",(e)=>{
 function updateUI(){
 
     document.getElementById("iron").textContent = state.iron;
+    document.getElementById("coal").textContent = state.coal;
     document.getElementById("heat").textContent = state.heat;
     document.getElementById("power").textContent = state.power;
     document.getElementById("science").textContent = state.science;
+
+    document.getElementById("furnace").textContent = state.furnace;
+    document.getElementById("generator").textContent = state.generator;
 }
 
 function update(){
@@ -144,8 +177,8 @@ function update(){
     if(keys["a"]) player.x -= player.speed;
     if(keys["d"]) player.x += player.speed;
 
-    player.x = Math.max(0, Math.min(MAP_W-1, player.x));
-    player.y = Math.max(0, Math.min(MAP_H-1, player.y));
+    player.x = Math.max(0,Math.min(MAP_W-1,player.x));
+    player.y = Math.max(0,Math.min(MAP_H-1,player.y));
 }
 
 function mine(){
@@ -156,33 +189,97 @@ function mine(){
     const tile = map[ty][tx];
 
     if(tile === "iron"){
+
         state.iron += 1;
         map[ty][tx] = "grass";
+
     }
 
     if(tile === "coal"){
-        state.heat += 10;
+
+        state.coal += 1;
         map[ty][tx] = "grass";
+
     }
 
     updateUI();
 }
 
-function burnCoal(){
+function craftFurnace(){
 
-    if(state.iron >= 1){
-        state.iron -= 1;
-        state.heat += 20;
+    if(state.iron >= 5){
+
+        state.iron -= 5;
+        state.furnace += 1;
+
     }
+    else{
+
+        alert("鉄が足りません");
+
+    }
+
+    updateUI();
+}
+
+function craftGenerator(){
+
+    if(state.iron >= 10 && state.furnace >= 1){
+
+        state.iron -= 10;
+        state.generator += 1;
+
+    }
+    else{
+
+        alert("素材不足");
+
+    }
+
+    updateUI();
+}
+
+function useFurnace(){
+
+    if(state.furnace <= 0){
+
+        alert("かまどがありません");
+        return;
+
+    }
+
+    if(state.coal <= 0){
+
+        alert("石炭がありません");
+        return;
+
+    }
+
+    state.coal -= 1;
+    state.heat += 25;
 
     updateUI();
 }
 
 function generatePower(){
 
+    if(state.generator <= 0){
+
+        alert("発電機がありません");
+        return;
+
+    }
+
     if(state.heat >= 10){
+
         state.heat -= 10;
-        state.power += 15;
+        state.power += 20;
+
+    }
+    else{
+
+        alert("熱不足");
+
     }
 
     updateUI();
@@ -190,14 +287,22 @@ function generatePower(){
 
 function research(){
 
-    if(state.power >= 20){
+    if(state.power >= 25){
 
-        state.power -= 20;
+        state.power -= 25;
         state.science += 1;
 
         if(state.science % 5 === 0){
+
             player.speed += 0.02;
+
         }
+
+    }
+    else{
+
+        alert("電力不足");
+
     }
 
     updateUI();
@@ -205,27 +310,38 @@ function research(){
 
 window.addEventListener("keydown",(e)=>{
 
+    const key = e.key.toLowerCase();
+
     if(e.code === "Space"){
         mine();
     }
 
-    if(e.key.toLowerCase() === "e"){
-        burnCoal();
+    if(key === "c"){
+        craftFurnace();
     }
 
-    if(e.key.toLowerCase() === "f"){
+    if(key === "g"){
+        craftGenerator();
+    }
+
+    if(key === "b"){
+        useFurnace();
+    }
+
+    if(key === "f"){
         generatePower();
     }
 
-    if(e.key.toLowerCase() === "r"){
+    if(key === "r"){
         research();
     }
+
 });
 
 function drawMap(){
 
-    const camX = player.x * TILE - canvas.width/2;
-    const camY = player.y * TILE - canvas.height/2;
+    const camX = player.x * TILE - canvas.width / 2;
+    const camY = player.y * TILE - canvas.height / 2;
 
     const startX = Math.floor(camX / TILE);
     const startY = Math.floor(camY / TILE);
@@ -245,16 +361,21 @@ function drawMap(){
 
             let color = "#22c55e";
 
-            if(tile === "iron") color = "#94a3b8";
-            if(tile === "coal") color = "#1e293b";
+            if(tile === "iron"){
+                color = "#94a3b8";
+            }
+
+            if(tile === "coal"){
+                color = "#111827";
+            }
 
             ctx.fillStyle = color;
 
             ctx.fillRect(
-                x*TILE - camX,
-                y*TILE - camY,
-                TILE-1,
-                TILE-1
+                x * TILE - camX,
+                y * TILE - camY,
+                TILE - 1,
+                TILE - 1
             );
         }
     }
@@ -265,30 +386,39 @@ function drawPlayer(){
     ctx.fillStyle = "#3b82f6";
 
     ctx.fillRect(
-        canvas.width/2 - 12,
-        canvas.height/2 - 12,
+        canvas.width / 2 - 12,
+        canvas.height / 2 - 12,
         24,
         24
     );
 }
 
-function drawScienceMachine(){
+function drawMachines(){
 
-    const x = 200;
-    const y = 200;
+    const x = 100;
+    const y = 100;
 
-    ctx.fillStyle = "#475569";
+    if(state.furnace > 0){
 
-    ctx.fillRect(x,y,80,80);
+        ctx.fillStyle = "#ea580c";
 
-    ctx.fillStyle = "#facc15";
+        ctx.fillRect(x,y,60,60);
 
-    ctx.beginPath();
-    ctx.arc(x+40,y+40,25,0,Math.PI*2);
-    ctx.fill();
+        ctx.fillStyle = "white";
+        ctx.fillText("かまど",x,y-10);
 
-    ctx.fillStyle = "white";
-    ctx.fillText("発電機",x+10,y+105);
+    }
+
+    if(state.generator > 0){
+
+        ctx.fillStyle = "#eab308";
+
+        ctx.fillRect(x+100,y,60,60);
+
+        ctx.fillStyle = "white";
+        ctx.fillText("発電機",x+100,y-10);
+
+    }
 }
 
 function render(){
@@ -297,7 +427,8 @@ function render(){
 
     drawMap();
     drawPlayer();
-    drawScienceMachine();
+    drawMachines();
+
 }
 
 function loop(){
@@ -312,5 +443,6 @@ updateUI();
 loop();
 
 </script>
+
 </body>
 </html>
